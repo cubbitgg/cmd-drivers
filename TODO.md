@@ -2,9 +2,13 @@
 
 - [x] make driver-scan lighter adding a service level to manage MountDisplay/monutinfo and make it more testable. The service should just return the list of all devices hiding all complexity but making filtering or configuration possible. We shoudl use interfaces.
 
-- add unit/integration tests to driver-scan
+- [x] add unit/integration tests to driver-scan
 
-- improve readme.md to make it more oss compatible moving all lsblk detail in another documentation file
+- migrate CLI to cobra (prerequisite for E2E tests with cobra test helpers)
+
+- add E2E tests using cobra test helpers (depends on cobra migration)
+
+- [x] improve readme.md to make it more oss compatible moving all lsblk detail in another documentation file
 
 - [x] add Makefile
 
