@@ -6,7 +6,7 @@
 
 - improve readme.md to make it more oss compatible moving all lsblk detail in another documentation file
 
-- add Makefile
+- [x] add Makefile
 
 - implement a first prototype of driver-mounter with uuid as input parameter, following all convention used for driver-scan and using a well know golang library to skip complexity. This cli should mount a disk identified by uuid in a default mount point creating a subfolder. the mount point can be passed as paramter.
 
