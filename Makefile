@@ -19,7 +19,10 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
-LDFLAGS := -ldflags "-X $(MODULE)/version.Version=$(VERSION)"
+COMMIT_HASH ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE  ?= $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+LDFLAGS := -ldflags "-X $(MODULE)/version.Version=$(VERSION) -X $(MODULE)/version.CommitHash=$(COMMIT_HASH) -X $(MODULE)/version.BuildDate=$(BUILD_DATE)"
 
 .PHONY: all
 all: build
@@ -50,7 +53,7 @@ test: fmt vet ## Run tests with coverage report.
 	go tool cover -func=cover.out
 
 .PHONY: run-scan
-run-scan: fmt vet ## Run driver-scan locally (pass args via ARGS, e.g. make run-scan ARGS="-dir /mnt -fs ext4").
+run-scan: fmt vet ## Run driver-scan locally (pass args via ARGS, e.g. make run-scan ARGS="--dir /mnt --fs ext4").
 	go run ./cmd/scan/ $(ARGS)
 
 ##@ Build

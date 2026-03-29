@@ -4,7 +4,7 @@
 
 - [x] add unit/integration tests to driver-scan
 
-- migrate CLI to cobra (prerequisite for E2E tests with cobra test helpers)
+- [x] migrate CLI to cobra (prerequisite for E2E tests with cobra test helpers)
 
 - add E2E tests using cobra test helpers (depends on cobra migration)
 
