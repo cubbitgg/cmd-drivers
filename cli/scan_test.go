@@ -83,7 +83,7 @@ func TestE2E_Scan_HappyPath(t *testing.T) {
 		cli.WithStatfsProvider(sp),
 		cli.WithLSBLK(lb),
 	)
-	cmd.SetArgs([]string{"--dir", "/mnt/cubbit", "--fs", "ext4", "--min-size", "0"})
+	cmd.SetArgs([]string{"--dir", "/mnt/cubbit", "--fs-type", "ext4", "--min-size", "0"})
 
 	var out string
 	var execErr error
@@ -112,7 +112,7 @@ func TestE2E_Scan_NoDevicesFound(t *testing.T) {
 		cli.WithStatfsProvider(sp),
 		cli.WithLSBLK(lb),
 	)
-	cmd.SetArgs([]string{"--dir", "/mnt/cubbit", "--fs", "ext4", "--min-size", "0"})
+	cmd.SetArgs([]string{"--dir", "/mnt/cubbit", "--fs-type", "ext4", "--min-size", "0"})
 
 	var out string
 	var execErr error
@@ -139,7 +139,7 @@ func TestE2E_Scan_MultipleFSTypes(t *testing.T) {
 		cli.WithStatfsProvider(sp),
 		cli.WithLSBLK(lb),
 	)
-	cmd.SetArgs([]string{"--dir", "/mnt/cubbit", "--fs", "ext4,xfs", "--min-size", "0"})
+	cmd.SetArgs([]string{"--dir", "/mnt/cubbit", "--fs-type", "ext4,xfs", "--min-size", "0"})
 
 	captureStdout(func() {
 		if err := cmd.Execute(); err != nil {
@@ -167,7 +167,7 @@ func TestE2E_Scan_ScanError(t *testing.T) {
 			},
 		}),
 	)
-	cmd.SetArgs([]string{"--dir", "/mnt/cubbit", "--fs", "ext4", "--min-size", "0"})
+	cmd.SetArgs([]string{"--dir", "/mnt/cubbit", "--fs-type", "ext4", "--min-size", "0"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -184,7 +184,7 @@ func TestE2E_Scan_InvalidFSType(t *testing.T) {
 	}
 
 	cmd := cli.NewScanCmd()
-	cmd.SetArgs([]string{"--fs", "btrfs"})
+	cmd.SetArgs([]string{"--fs-type", "btrfs"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -201,7 +201,7 @@ func TestE2E_Scan_EmptyDir(t *testing.T) {
 	}
 
 	cmd := cli.NewScanCmd()
-	cmd.SetArgs([]string{"--dir", "", "--fs", "ext4"})
+	cmd.SetArgs([]string{"--dir", "", "--fs-type", "ext4"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -240,7 +240,7 @@ func TestE2E_Scan_DebugOverridesLogLevel(t *testing.T) {
 		cli.WithStatfsProvider(sp),
 		cli.WithLSBLK(lb),
 	)
-	cmd.SetArgs([]string{"--debug", "--log-level", "info", "--dir", "/mnt/cubbit", "--fs", "ext4", "--min-size", "0"})
+	cmd.SetArgs([]string{"--debug", "--log-level", "info", "--dir", "/mnt/cubbit", "--fs-type", "ext4", "--min-size", "0"})
 
 	captureStdout(func() {
 		if err := cmd.Execute(); err != nil {

@@ -335,3 +335,25 @@ func TestUnit_ScanAll_MountedError(t *testing.T) {
 		t.Fatal("expected error from ScanAll when ScanMounted fails, got nil")
 	}
 }
+
+func TestUnit_ScanAll_UnmountedError(t *testing.T) {
+	scanner := services.NewScanner(
+		defaultConfig(),
+		&mocks.MockMountInfoProvider{
+			GetMountsFunc: func(_ context.Context) ([]models.MountEntry, error) {
+				return []models.MountEntry{}, nil
+			},
+		},
+		&mocks.MockStatfsProvider{},
+		&mocks.MockLSBLK{
+			GetBlockDevicesFunc: func(_ context.Context, _ fsutils.FilterFunc) ([]fsutils.BlockDevice, error) {
+				return nil, errors.New("lsblk failed")
+			},
+		},
+	)
+
+	_, err := scanner.ScanAll(testCtx())
+	if err == nil {
+		t.Fatal("expected error from ScanAll when ScanUnmounted fails, got nil")
+	}
+}

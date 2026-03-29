@@ -33,11 +33,6 @@ func newVersionCmd() *cobra.Command {
 		Use:          "version",
 		Short:        "Print version information",
 		SilenceUsage: true,
-		Example: `  # Show full version information
-  driver-scan version
-
-  # Show only the version number
-  driver-scan version --short`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return opts.run(cmd, args)
 		},

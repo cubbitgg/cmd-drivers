@@ -18,12 +18,12 @@ import (
 type ScanOption func(*scanOpts)
 
 // WithStatfsProvider injects a StatfsProvider. If not set, the real provider is used.
-func WithStatfsProvider(p services.StatfsProvider) ScanOption {
+func WithStatfsProvider(p providers.StatfsProvider) ScanOption {
 	return func(o *scanOpts) { o.statfsProvider = p }
 }
 
 // WithMountInfoProvider injects a MountInfoProvider. If not set, the real provider is used.
-func WithMountInfoProvider(p services.MountInfoProvider) ScanOption {
+func WithMountInfoProvider(p providers.MountInfoProvider) ScanOption {
 	return func(o *scanOpts) { o.mountInfoProvider = p }
 }
 
@@ -44,8 +44,8 @@ type scanOpts struct {
 	fsTypes []fsutils.FSType
 
 	// injectable last-mile providers (nil = use real implementations)
-	statfsProvider    services.StatfsProvider
-	mountInfoProvider services.MountInfoProvider
+	statfsProvider    providers.StatfsProvider
+	mountInfoProvider providers.MountInfoProvider
 	lsblk             fsutils.LSBLK
 }
 
@@ -65,7 +65,7 @@ func (o *scanOpts) validate() error {
 		return err
 	}
 	if len(fsTypes) == 0 {
-		return fmt.Errorf("--fs must include at least one filesystem type")
+		return fmt.Errorf("--fs-type must include at least one filesystem type")
 	}
 	o.fsTypes = fsTypes
 	return nil
@@ -83,7 +83,7 @@ func (o *scanOpts) run(cmd *cobra.Command, args []string) error {
 		Uint64("min_size", o.minSize).
 		Str("min_size_human", humanize.IBytes(o.minSize)).
 		Str("log_level", o.resolvedLogLevel).
-		Msg("Starting mount list application")
+		Msg("Starting device scan")
 
 	statfs := o.statfsProvider
 	if statfs == nil {
@@ -142,8 +142,8 @@ func NewScanCmd(options ...ScanOption) *cobra.Command {
 	}
 	addGlobalFlags(cmd, &opts.globalOpts)
 	cmd.Flags().StringVar(&opts.dir, "dir", DefaultMountDir, "Filter mount points under this directory")
-	cmd.Flags().StringVar(&opts.fs, "fs", string(fsutils.FSTypeExt4), "Comma-separated list of filesystem types to include ("+fsutils.ValidFSTypeList()+")")
-	cmd.Flags().Uint64Var(&opts.minSize, "min-size", 50*1024*1024, "Minimum mount point size in bytes (default: 50MB)")
+	cmd.Flags().StringVar(&opts.fs, "fs-type", string(fsutils.FSTypeExt4), "Comma-separated list of filesystem types to include ("+fsutils.ValidFSTypeList()+")")
+	cmd.Flags().Uint64Var(&opts.minSize, "min-size", 50*1024*1024, "Minimum mount point size in bytes")
 	cmd.AddCommand(newVersionCmd())
 	return cmd
 }

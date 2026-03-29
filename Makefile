@@ -53,8 +53,16 @@ test: fmt vet ## Run tests with coverage report.
 	go tool cover -func=cover.out
 
 .PHONY: run-scan
-run-scan: fmt vet ## Run driver-scan locally (pass args via ARGS, e.g. make run-scan ARGS="--dir /mnt --fs ext4").
+run-scan: fmt vet ## Run driver-scan locally (pass args via ARGS, e.g. make run-scan ARGS="--dir /mnt --fs-type ext4").
 	go run ./cmd/scan/ $(ARGS)
+
+.PHONY: run-mounter
+run-mounter: fmt vet ## Run driver-mounter locally (pass args via ARGS, e.g. make run-mounter ARGS="--uuid <UUID>").
+	go run ./cmd/mounter/ $(ARGS)
+
+.PHONY: run-init
+run-init: fmt vet ## Run driver-init locally (pass args via ARGS, e.g. make run-init ARGS="--dry-run").
+	go run ./cmd/init/ $(ARGS)
 
 ##@ Build
 

@@ -8,6 +8,7 @@ import (
 	"github.com/cubbitgg/cmd-drivers/fsutils"
 	"github.com/cubbitgg/cmd-drivers/logger"
 	"github.com/cubbitgg/cmd-drivers/models"
+	"github.com/cubbitgg/cmd-drivers/providers"
 )
 
 // ScanConfig holds filtering parameters for device scanning.
@@ -15,16 +16,6 @@ type ScanConfig struct {
 	DirPrefix string   // filter mounted devices under this path (e.g. "/mnt/cubbit")
 	FSTypes   []string // filesystem types to include (e.g. ["ext4"])
 	MinSize   uint64   // minimum device size in bytes
-}
-
-// MountInfoProvider reads mount information from the system.
-type MountInfoProvider interface {
-	GetMounts(ctx context.Context) ([]models.MountEntry, error)
-}
-
-// StatfsProvider reads filesystem statistics for a mount point.
-type StatfsProvider interface {
-	Statfs(path string) (*models.StatfsResult, error)
 }
 
 // DeviceScanner returns lists of block devices, both mounted and unmounted.
@@ -36,13 +27,13 @@ type DeviceScanner interface {
 
 type scanner struct {
 	config ScanConfig
-	mounts MountInfoProvider
-	statfs StatfsProvider
+	mounts providers.MountInfoProvider
+	statfs providers.StatfsProvider
 	lsblk  fsutils.LSBLK
 }
 
 // NewScanner creates a DeviceScanner with the given dependencies.
-func NewScanner(config ScanConfig, mounts MountInfoProvider, statfs StatfsProvider, lsblk fsutils.LSBLK) DeviceScanner {
+func NewScanner(config ScanConfig, mounts providers.MountInfoProvider, statfs providers.StatfsProvider, lsblk fsutils.LSBLK) DeviceScanner {
 	return &scanner{
 		config: config,
 		mounts: mounts,
@@ -63,7 +54,9 @@ func (s *scanner) ScanAll(ctx context.Context) ([]models.DeviceInfo, error) {
 		return nil, fmt.Errorf("scanning unmounted devices: %w", err)
 	}
 
-	all := append(mounted, unmounted...)
+	all := make([]models.DeviceInfo, 0, len(mounted)+len(unmounted))
+	all = append(all, mounted...)
+	all = append(all, unmounted...)
 	sort.Slice(all, func(i, j int) bool {
 		return all[i].UUID < all[j].UUID
 	})

@@ -12,6 +12,6 @@
 
 - [x] add Makefile
 
-- implement a first prototype of driver-mounter with uuid as input parameter, following all convention used for driver-scan and using a well know golang library to skip complexity. This cli should mount a disk identified by uuid in a default mount point creating a subfolder. the mount point can be passed as paramter.
+- [x] implement a first prototype of driver-mounter with uuid as input parameter, following all convention used for driver-scan and using a well know golang library to skip complexity. This cli should mount a disk identified by uuid in a default mount point creating a subfolder. the mount point can be passed as paramter.
 
-- implement a first prototype of driver-init following all convention used for driver-scan and using a well know golang library to skip complexity. This cli should partion/format with ext4 or a configurable FS an available disk after a scan (use a service used by driver-scan too). Check the best option to partion or format (library or exec program).
+- [x] implement a first prototype of driver-init following all convention used for driver-scan and using a well know golang library to skip complexity. This cli should partion/format with ext4 or a configurable FS an available disk after a scan (use a service used by driver-scan too). Check the best option to partion or format (library or exec program).
