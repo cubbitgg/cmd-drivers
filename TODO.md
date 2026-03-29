@@ -6,7 +6,7 @@
 
 - [x] migrate CLI to cobra (prerequisite for E2E tests with cobra test helpers)
 
-- add E2E tests using cobra test helpers (depends on cobra migration)
+- [x] add E2E tests using cobra test helpers (depends on cobra migration)
 
 - [x] improve readme.md to make it more oss compatible moving all lsblk detail in another documentation file
 

@@ -13,6 +13,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ScanOption configures optional dependencies for NewScanCmd.
+// Used by tests to inject mock providers; production callers pass no options.
+type ScanOption func(*scanOpts)
+
+// WithStatfsProvider injects a StatfsProvider. If not set, the real provider is used.
+func WithStatfsProvider(p services.StatfsProvider) ScanOption {
+	return func(o *scanOpts) { o.statfsProvider = p }
+}
+
+// WithMountInfoProvider injects a MountInfoProvider. If not set, the real provider is used.
+func WithMountInfoProvider(p services.MountInfoProvider) ScanOption {
+	return func(o *scanOpts) { o.mountInfoProvider = p }
+}
+
+// WithLSBLK injects an LSBLK implementation. If not set, the real implementation is used.
+func WithLSBLK(l fsutils.LSBLK) ScanOption {
+	return func(o *scanOpts) { o.lsblk = l }
+}
+
 type scanOpts struct {
 	globalOpts
 
@@ -23,6 +42,11 @@ type scanOpts struct {
 
 	// resolved by validate()
 	fsTypes []fsutils.FSType
+
+	// injectable last-mile providers (nil = use real implementations)
+	statfsProvider    services.StatfsProvider
+	mountInfoProvider services.MountInfoProvider
+	lsblk             fsutils.LSBLK
 }
 
 func (o *scanOpts) complete() {
@@ -61,19 +85,28 @@ func (o *scanOpts) run(cmd *cobra.Command, args []string) error {
 		Str("log_level", o.resolvedLogLevel).
 		Msg("Starting mount list application")
 
+	statfs := o.statfsProvider
+	if statfs == nil {
+		statfs = providers.NewStatfsProvider()
+	}
+
+	mounts := o.mountInfoProvider
+	if mounts == nil {
+		mounts = providers.NewMountInfoProvider(o.dir, fsTypesStr, o.minSize, statfs)
+	}
+
+	lsblk := o.lsblk
+	if lsblk == nil {
+		lsblk = fsutils.NewLSBLK()
+	}
+
 	config := services.ScanConfig{
 		DirPrefix: o.dir,
 		FSTypes:   fsTypesStr,
 		MinSize:   o.minSize,
 	}
 
-	statfsProvider := providers.NewStatfsProvider()
-	scanner := services.NewScanner(
-		config,
-		providers.NewMountInfoProvider(o.dir, fsTypesStr, o.minSize, statfsProvider),
-		statfsProvider,
-		fsutils.NewLSBLK(),
-	)
+	scanner := services.NewScanner(config, mounts, statfs, lsblk)
 
 	devices, err := scanner.ScanAll(ctx)
 	if err != nil {
@@ -88,8 +121,12 @@ func (o *scanOpts) run(cmd *cobra.Command, args []string) error {
 }
 
 // NewScanCmd returns the cobra command for driver-scan.
-func NewScanCmd() *cobra.Command {
+// Pass ScanOption values to inject mock providers (for testing only).
+func NewScanCmd(options ...ScanOption) *cobra.Command {
 	opts := &scanOpts{}
+	for _, o := range options {
+		o(opts)
+	}
 	cmd := &cobra.Command{
 		Use:           "driver-scan",
 		Short:         "Scan for mounted and unmounted block devices",
