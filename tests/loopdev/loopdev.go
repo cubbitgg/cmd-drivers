@@ -97,6 +97,23 @@ func UUID(t *testing.T, dev Device) string {
 	return ""
 }
 
+// Mount mounts the device at the given mount point, creating the directory if needed.
+// It registers t.Cleanup() to unmount before the loop device is detached.
+func Mount(t *testing.T, dev Device, mountPoint string) {
+	t.Helper()
+	if err := os.MkdirAll(mountPoint, 0750); err != nil {
+		t.Fatalf("loopdev: mkdir %s: %v", mountPoint, err)
+	}
+	if out, err := exec.Command("mount", dev.DevicePath, mountPoint).CombinedOutput(); err != nil {
+		t.Fatalf("loopdev: mount %s at %s: %v\noutput: %s", dev.DevicePath, mountPoint, err, out)
+	}
+	t.Logf("Mounted %s at %s", dev.DevicePath, mountPoint)
+	t.Cleanup(func() {
+		t.Logf("Cleaning up: unmounting %s", mountPoint)
+		exec.Command("umount", mountPoint).Run() //nolint:errcheck
+	})
+}
+
 // FSType returns the filesystem type reported by lsblk for the device, waiting
 // up to 5 seconds for udev to populate it. Returns an empty string if none.
 func FSType(t *testing.T, dev Device) string {

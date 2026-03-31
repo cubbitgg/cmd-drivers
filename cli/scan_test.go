@@ -6,12 +6,15 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/cubbitgg/cmd-drivers/cli"
 	"github.com/cubbitgg/cmd-drivers/fsutils"
 	"github.com/cubbitgg/cmd-drivers/models"
+	"github.com/cubbitgg/cmd-drivers/tests/loopdev"
 	"github.com/cubbitgg/cmd-drivers/tests/mocks"
 )
 
@@ -72,11 +75,9 @@ func emptyMocks() (*mocks.MockMountInfoProvider, *mocks.MockStatfsProvider, *moc
 	return mip, sp, lb
 }
 
-func TestE2E_Scan_HappyPath(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
+// ---- Integration tests (mocked providers) ----
 
+func TestIntegration_Scan_HappyPath(t *testing.T) {
 	mip, sp, lb := mountedDeviceMocks()
 	cmd := cli.NewScanCmd(
 		cli.WithMountInfoProvider(mip),
@@ -101,11 +102,7 @@ func TestE2E_Scan_HappyPath(t *testing.T) {
 	}
 }
 
-func TestE2E_Scan_NoDevicesFound(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
-
+func TestIntegration_Scan_NoDevicesFound(t *testing.T) {
 	mip, sp, lb := emptyMocks()
 	cmd := cli.NewScanCmd(
 		cli.WithMountInfoProvider(mip),
@@ -128,11 +125,7 @@ func TestE2E_Scan_NoDevicesFound(t *testing.T) {
 	}
 }
 
-func TestE2E_Scan_MultipleFSTypes(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
-
+func TestIntegration_Scan_MultipleFSTypes(t *testing.T) {
 	mip, sp, lb := emptyMocks()
 	cmd := cli.NewScanCmd(
 		cli.WithMountInfoProvider(mip),
@@ -148,11 +141,7 @@ func TestE2E_Scan_MultipleFSTypes(t *testing.T) {
 	})
 }
 
-func TestE2E_Scan_ScanError(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
-
+func TestIntegration_Scan_ScanError(t *testing.T) {
 	mip := &mocks.MockMountInfoProvider{
 		GetMountsFunc: func(_ context.Context) ([]models.MountEntry, error) {
 			return nil, errors.New("mountinfo unavailable")
@@ -178,11 +167,7 @@ func TestE2E_Scan_ScanError(t *testing.T) {
 	}
 }
 
-func TestE2E_Scan_InvalidFSType(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
-
+func TestIntegration_Scan_InvalidFSType(t *testing.T) {
 	cmd := cli.NewScanCmd()
 	cmd.SetArgs([]string{"--fs-type", "btrfs"})
 
@@ -195,11 +180,7 @@ func TestE2E_Scan_InvalidFSType(t *testing.T) {
 	}
 }
 
-func TestE2E_Scan_EmptyDir(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
-
+func TestIntegration_Scan_EmptyDir(t *testing.T) {
 	cmd := cli.NewScanCmd()
 	cmd.SetArgs([]string{"--dir", "", "--fs-type", "ext4"})
 
@@ -212,11 +193,7 @@ func TestE2E_Scan_EmptyDir(t *testing.T) {
 	}
 }
 
-func TestE2E_Scan_InvalidLogLevel(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
-
+func TestIntegration_Scan_InvalidLogLevel(t *testing.T) {
 	cmd := cli.NewScanCmd()
 	cmd.SetArgs([]string{"--log-level", "banana"})
 
@@ -229,11 +206,7 @@ func TestE2E_Scan_InvalidLogLevel(t *testing.T) {
 	}
 }
 
-func TestE2E_Scan_DebugOverridesLogLevel(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
-
+func TestIntegration_Scan_DebugOverridesLogLevel(t *testing.T) {
 	mip, sp, lb := emptyMocks()
 	cmd := cli.NewScanCmd(
 		cli.WithMountInfoProvider(mip),
@@ -249,11 +222,7 @@ func TestE2E_Scan_DebugOverridesLogLevel(t *testing.T) {
 	})
 }
 
-func TestE2E_Scan_Help(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
-
+func TestIntegration_Scan_Help(t *testing.T) {
 	cmd := cli.NewScanCmd()
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
@@ -269,11 +238,7 @@ func TestE2E_Scan_Help(t *testing.T) {
 	}
 }
 
-func TestE2E_Scan_Version(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
-
+func TestIntegration_Scan_Version(t *testing.T) {
 	cmd := cli.NewScanCmd()
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
@@ -288,11 +253,7 @@ func TestE2E_Scan_Version(t *testing.T) {
 	}
 }
 
-func TestE2E_Scan_VersionShort(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping E2E test")
-	}
-
+func TestIntegration_Scan_VersionShort(t *testing.T) {
 	cmd := cli.NewScanCmd()
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
@@ -306,8 +267,114 @@ func TestE2E_Scan_VersionShort(t *testing.T) {
 	if out == "" {
 		t.Error("expected non-empty version output for --short")
 	}
-	// --short should print a single line (no labels like "Commit:", "Built:", etc.)
 	if strings.Contains(out, "Commit:") || strings.Contains(out, "Built:") {
 		t.Errorf("--short output should be version only, got:\n%s", out)
+	}
+}
+
+// ---- Real E2E tests (real loop devices, no mocks) ----
+
+func TestE2E_Scan_MountedDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping E2E test")
+	}
+	loopdev.RequireRoot(t)
+
+	dev := loopdev.Create(t, loopDevSize)
+	loopdev.Format(t, dev, "ext4")
+	devUUID := loopdev.UUID(t, dev)
+
+	mountBase := t.TempDir()
+	mountTarget := filepath.Join(mountBase, "data")
+	loopdev.Mount(t, dev, mountTarget)
+
+	cmd := cli.NewScanCmd()
+	cmd.SetArgs([]string{"--debug", "--dir", mountBase, "--fs-type", "ext4", "--min-size", "0"})
+
+	var out string
+	var execErr error
+	out = captureStdout(func() {
+		execErr = cmd.Execute()
+	})
+
+	if execErr != nil {
+		t.Fatalf("unexpected error: %v", execErr)
+	}
+	for _, want := range []string{devUUID, dev.DevicePath, "ext4", "mounted"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q; full output:\n%s", want, out)
+		}
+	}
+}
+
+func TestE2E_Scan_UnmountedDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping E2E test")
+	}
+	loopdev.RequireRoot(t)
+
+	dev := loopdev.Create(t, loopDevSize)
+	loopdev.Format(t, dev, "ext4")
+	devUUID := loopdev.UUID(t, dev)
+
+	// Use a unique dir prefix so no mounted devices match.
+	cmd := cli.NewScanCmd()
+	cmd.SetArgs([]string{"--debug", "--dir", t.TempDir(), "--fs-type", "ext4", "--min-size", "0"})
+
+	var out string
+	var execErr error
+	out = captureStdout(func() {
+		execErr = cmd.Execute()
+	})
+
+	if execErr != nil {
+		t.Fatalf("unexpected error: %v", execErr)
+	}
+	// Our device should appear in the unmounted section.
+	for _, want := range []string{devUUID, dev.DevicePath, "ext4"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q; full output:\n%s", want, out)
+		}
+	}
+}
+
+func TestE2E_Scan_MultipleFSTypes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping E2E test")
+	}
+	loopdev.RequireRoot(t)
+
+	if _, err := exec.LookPath("mkfs.xfs"); err != nil {
+		t.Skip("mkfs.xfs not available (install xfsprogs)")
+	}
+
+	devExt4 := loopdev.Create(t, loopDevSize)
+	loopdev.Format(t, devExt4, "ext4")
+	uuidExt4 := loopdev.UUID(t, devExt4)
+
+	devXFS := loopdev.Create(t, loopDevSize)
+	loopdev.Format(t, devXFS, "xfs")
+	uuidXFS := loopdev.UUID(t, devXFS)
+
+	mountBase := t.TempDir()
+	loopdev.Mount(t, devExt4, filepath.Join(mountBase, "ext4"))
+	loopdev.Mount(t, devXFS, filepath.Join(mountBase, "xfs"))
+
+	cmd := cli.NewScanCmd()
+	cmd.SetArgs([]string{"--debug", "--dir", mountBase, "--fs-type", "ext4,xfs", "--min-size", "0"})
+
+	var out string
+	var execErr error
+	out = captureStdout(func() {
+		execErr = cmd.Execute()
+	})
+
+	if execErr != nil {
+		t.Fatalf("unexpected error: %v", execErr)
+	}
+	for _, want := range []string{uuidExt4, uuidXFS, "ext4", "xfs"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q; full output:\n%s", want, out)
+		}
 	}
 }
