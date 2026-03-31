@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/cubbitgg/cmd-drivers/cli"
 	"github.com/cubbitgg/cmd-drivers/fsutils"
@@ -23,28 +22,6 @@ func unformattedLSBLK(devices []fsutils.BlockDevice) *mocks.MockLSBLK {
 			return devices, nil
 		},
 	}
-}
-
-// lsblkFSType returns the filesystem type reported by lsblk for the given device,
-// or an empty string if none is present.
-func lsblkFSType(t *testing.T, devicePath string) string {
-	t.Helper()
-	// wait for kernel/udev to catch up
-	exec.Command("udevadm", "settle").Run()
-	timeout := 5 * time.Second
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		out, err := exec.Command("lsblk", "--nodeps", "--noheadings", "--output", "FSTYPE", devicePath).CombinedOutput()
-		if err != nil {
-			t.Fatalf("lsblk FSTYPE for %s: %v\noutput: %s", devicePath, err, out)
-		}
-
-		if len(bytes.TrimSpace(out)) > 0 {
-			return strings.TrimSpace(string(out))
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	return ""
 }
 
 func TestE2E_Init_FormatExt4(t *testing.T) {
@@ -66,7 +43,7 @@ func TestE2E_Init_FormatExt4(t *testing.T) {
 	if !strings.Contains(buf.String(), dev.DevicePath) {
 		t.Errorf("expected %s in output; got:\n%s", dev.DevicePath, buf.String())
 	}
-	if got := lsblkFSType(t, dev.DevicePath); got != "ext4" {
+	if got := loopdev.FSType(t, dev); got != "ext4" {
 		t.Errorf("expected filesystem type ext4, got %q", got)
 	}
 }
@@ -94,7 +71,7 @@ func TestE2E_Init_FormatXFS(t *testing.T) {
 	if !strings.Contains(buf.String(), dev.DevicePath) {
 		t.Errorf("expected %s in output; got:\n%s", dev.DevicePath, buf.String())
 	}
-	if got := lsblkFSType(t, dev.DevicePath); got != "xfs" {
+	if got := loopdev.FSType(t, dev); got != "xfs" {
 		t.Errorf("expected filesystem type xfs, got %q", got)
 	}
 }
@@ -121,7 +98,7 @@ func TestE2E_Init_DryRunReal(t *testing.T) {
 	if !strings.Contains(buf.String(), dev.DevicePath) {
 		t.Errorf("expected %s in dry-run output; got:\n%s", dev.DevicePath, buf.String())
 	}
-	if got := lsblkFSType(t, dev.DevicePath); got != "" {
+	if got := loopdev.FSType(t, dev); got != "" {
 		t.Errorf("expected no filesystem after dry-run, got %q", got)
 	}
 }
@@ -146,7 +123,7 @@ func TestE2E_Init_MultipleDevices(t *testing.T) {
 		if !strings.Contains(buf.String(), dev.DevicePath) {
 			t.Errorf("expected %s in output; got:\n%s", dev.DevicePath, buf.String())
 		}
-		if got := lsblkFSType(t, dev.DevicePath); got != "ext4" {
+		if got := loopdev.FSType(t, dev); got != "ext4" {
 			t.Errorf("expected filesystem type ext4 on %s, got %q", dev.DevicePath, got)
 		}
 	}

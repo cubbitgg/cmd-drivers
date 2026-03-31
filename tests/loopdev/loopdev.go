@@ -1,10 +1,14 @@
 package loopdev
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/cubbitgg/cmd-drivers/providers"
 )
 
 // Device holds the sparse file path and the loop device path (e.g. "/dev/loop5").
@@ -59,6 +63,68 @@ func Create(t *testing.T, size int64) Device {
 		FilePath:   filePath,
 		DevicePath: devicePath,
 	}
+}
+
+// Format formats the device with the given filesystem type using the real FormatProvider.
+// It calls udevadm settle after formatting to ensure the kernel/udev cache is updated.
+func Format(t *testing.T, dev Device, fsType string) {
+	t.Helper()
+	if err := providers.NewFormatProvider().Format(context.Background(), dev.DevicePath, fsType); err != nil {
+		t.Fatalf("loopdev: format %s with %s: %v", dev.DevicePath, fsType, err)
+	}
+	exec.Command("udevadm", "settle").Run() //nolint:errcheck
+	t.Logf("Formatted %s as %s", dev.DevicePath, fsType)
+}
+
+// UUID returns the filesystem UUID of the device, waiting up to 5 seconds for
+// udev to populate it. Fatally fails the test if the UUID cannot be determined.
+func UUID(t *testing.T, dev Device) string {
+	t.Helper()
+	exec.Command("udevadm", "settle").Run() //nolint:errcheck
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		out, err := exec.Command("lsblk", "--nodeps", "--noheadings", "--output", "UUID", dev.DevicePath).CombinedOutput()
+		if err != nil {
+			t.Fatalf("loopdev: lsblk UUID for %s: %v\noutput: %s", dev.DevicePath, err, out)
+		}
+		if u := strings.TrimSpace(string(out)); u != "" {
+			t.Logf("UUID for %s: %s", dev.DevicePath, u)
+			return u
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("loopdev: timed out waiting for UUID on %s", dev.DevicePath)
+	return ""
+}
+
+// FSType returns the filesystem type reported by lsblk for the device, waiting
+// up to 5 seconds for udev to populate it. Returns an empty string if none.
+func FSType(t *testing.T, dev Device) string {
+	t.Helper()
+	exec.Command("udevadm", "settle").Run() //nolint:errcheck
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		out, err := exec.Command("lsblk", "--nodeps", "--noheadings", "--output", "FSTYPE", dev.DevicePath).CombinedOutput()
+		if err != nil {
+			t.Fatalf("loopdev: lsblk FSTYPE for %s: %v\noutput: %s", dev.DevicePath, err, out)
+		}
+		if v := strings.TrimSpace(string(out)); v != "" {
+			return v
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return ""
+}
+
+// MountPoint returns the current mount point of the device as reported by lsblk,
+// or an empty string if the device is not mounted.
+func MountPoint(t *testing.T, dev Device) string {
+	t.Helper()
+	out, err := exec.Command("lsblk", "--nodeps", "--noheadings", "--output", "MOUNTPOINT", dev.DevicePath).CombinedOutput()
+	if err != nil {
+		t.Fatalf("loopdev: lsblk MOUNTPOINT for %s: %v\noutput: %s", dev.DevicePath, err, out)
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // CreateN creates n loop devices each of the given size.

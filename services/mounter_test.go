@@ -211,6 +211,11 @@ func TestUnit_Unmount_Error(t *testing.T) {
 	dir := t.TempDir()
 	uuid := "550e8400-e29b-41d4-a716-446655440000"
 
+	// Pre-create the target directory: in real usage Mount creates it via MkdirAll.
+	if err := os.MkdirAll(filepath.Join(dir, uuid), 0750); err != nil {
+		t.Fatalf("setup: mkdir: %v", err)
+	}
+
 	mountProv := &mocks.MockK8sMountProvider{
 		IsLikelyNotMountPointFunc: func(_ string) (bool, error) { return false, nil },
 		UnmountFunc: func(_ string) error {

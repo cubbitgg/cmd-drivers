@@ -106,6 +106,11 @@ func (m *deviceMounter) Unmount(ctx context.Context) error {
 
 	target := filepath.Join(m.config.MountPoint, m.config.UUID)
 
+	if _, err := os.Stat(target); os.IsNotExist(err) {
+		log.Info().Str("target", target).Msg("Mount point does not exist, nothing to unmount")
+		return nil
+	}
+
 	notMounted, err := m.mount.IsLikelyNotMountPoint(target)
 	if err != nil {
 		return fmt.Errorf("check mount point %q: %w", target, err)
