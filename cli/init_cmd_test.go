@@ -10,6 +10,7 @@ import (
 
 	"github.com/cubbitgg/cmd-drivers/cli"
 	"github.com/cubbitgg/cmd-drivers/fsutils"
+	"github.com/cubbitgg/cmd-drivers/providers"
 	"github.com/cubbitgg/cmd-drivers/tests/loopdev"
 	"github.com/cubbitgg/cmd-drivers/tests/mocks"
 )
@@ -177,7 +178,7 @@ func TestIntegration_Init_FormatsDevice(t *testing.T) {
 		{Name: "/dev/sdb", Type: "disk", Size: 100 * 1024 * 1024},
 	}
 	format := &mocks.MockFormatProvider{
-		FormatFunc: func(_ context.Context, _, _ string) error { return nil },
+		FormatFunc: func(_ context.Context, _ string, _ providers.FormatOptions) error { return nil },
 	}
 
 	cmd := cli.NewInitCmd(
@@ -222,7 +223,7 @@ func TestIntegration_Init_FormatError(t *testing.T) {
 		{Name: "/dev/sdb", Type: "disk", Size: 100 * 1024 * 1024},
 	}
 	format := &mocks.MockFormatProvider{
-		FormatFunc: func(_ context.Context, _, _ string) error {
+		FormatFunc: func(_ context.Context, _ string, _ providers.FormatOptions) error {
 			return errors.New("mkfs failed")
 		},
 	}

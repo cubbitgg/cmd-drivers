@@ -10,9 +10,15 @@ import (
 	"github.com/cubbitgg/cmd-drivers/logger"
 )
 
+// FormatOptions holds parameters for formatting a block device.
+type FormatOptions struct {
+	FSType string
+	Label  string // optional; empty means no label flag is passed to mkfs
+}
+
 // FormatProvider formats a block device with a given filesystem type.
 type FormatProvider interface {
-	Format(ctx context.Context, device, fsType string) error
+	Format(ctx context.Context, device string, opts FormatOptions) error
 }
 
 type realFormatProvider struct{}
@@ -22,15 +28,26 @@ func NewFormatProvider() FormatProvider {
 	return &realFormatProvider{}
 }
 
-func (p *realFormatProvider) Format(ctx context.Context, device, fsType string) error {
+func (p *realFormatProvider) Format(ctx context.Context, device string, opts FormatOptions) error {
 	log := logger.FromContext(ctx)
-	if !fsutils.IsValidFSType(fsType) {
-		return fmt.Errorf("unsupported filesystem type %q", fsType)
+	if !fsutils.IsValidFSType(opts.FSType) {
+		return fmt.Errorf("unsupported filesystem type %q", opts.FSType)
 	}
-	cmd := exec.CommandContext(ctx, "mkfs."+fsType, device)
+
+	args := []string{device}
+	if opts.Label != "" {
+		switch opts.FSType {
+		case string(fsutils.FSTypeVFAT):
+			args = append([]string{"-n", opts.Label}, args...)
+		default: // ext4, xfs, ntfs all use -L
+			args = append([]string{"-L", opts.Label}, args...)
+		}
+	}
+
+	cmd := exec.CommandContext(ctx, "mkfs."+opts.FSType, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("mkfs.%s %q failed: %w\noutput: %s", fsType, device, err, out)
+		return fmt.Errorf("mkfs.%s %q failed: %w\noutput: %s", opts.FSType, device, err, out)
 	}
 
 	syscall.Sync()

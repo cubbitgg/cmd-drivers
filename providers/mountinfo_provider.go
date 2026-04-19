@@ -74,6 +74,32 @@ func and(filters ...mountinfo.FilterFunc) mountinfo.FilterFunc {
 	}
 }
 
+// NewUnfilteredMountInfoProvider returns a MountInfoProvider that returns all
+// mounts with no filtering — used internally by the mounter for root-disk detection.
+func NewUnfilteredMountInfoProvider() MountInfoProvider {
+	return &unfilteredMountInfoProvider{}
+}
+
+type unfilteredMountInfoProvider struct{}
+
+func (p *unfilteredMountInfoProvider) GetMounts(ctx context.Context) ([]models.MountEntry, error) {
+	log := logger.FromContext(ctx)
+	mounts, err := mountinfo.GetMounts(nil)
+	if err != nil {
+		return nil, fmt.Errorf("reading mounts: %w", err)
+	}
+	entries := make([]models.MountEntry, 0, len(mounts))
+	for _, m := range mounts {
+		entries = append(entries, models.MountEntry{
+			Source:     m.Source,
+			Mountpoint: m.Mountpoint,
+			FSType:     m.FSType,
+		})
+	}
+	log.Debug().Int("count", len(entries)).Msg("Got all system mounts (unfiltered)")
+	return entries, nil
+}
+
 // createSizeFilter returns a mountinfo.FilterFunc that skips mount points
 // whose total size is smaller than minSize.
 func createSizeFilter(statfs StatfsProvider, minSize uint64) mountinfo.FilterFunc {

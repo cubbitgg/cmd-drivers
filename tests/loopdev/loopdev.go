@@ -69,7 +69,7 @@ func Create(t *testing.T, size int64) Device {
 // It calls udevadm settle after formatting to ensure the kernel/udev cache is updated.
 func Format(t *testing.T, dev Device, fsType string) {
 	t.Helper()
-	if err := providers.NewFormatProvider().Format(context.Background(), dev.DevicePath, fsType); err != nil {
+	if err := providers.NewFormatProvider().Format(context.Background(), dev.DevicePath, providers.FormatOptions{FSType: fsType}); err != nil {
 		t.Fatalf("loopdev: format %s with %s: %v", dev.DevicePath, fsType, err)
 	}
 	exec.Command("udevadm", "settle").Run() //nolint:errcheck

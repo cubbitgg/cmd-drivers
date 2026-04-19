@@ -15,7 +15,35 @@ A collection of Linux CLI tools for managing block devices — scanning, mountin
 - Linux (relies on `/proc/self/mountinfo`, `lsblk`, `syscall.Statfs`, and mount syscalls)
 - Go 1.25+
 - `lsblk` (part of `util-linux`, available on all major distros)
+- `udevadm` (part of `systemd`, available on all major distros) — required by `driver-init` to flush the udev cache after formatting so subsequent `lsblk` calls see the new UUID
 - `mkfs.<fstype>` (e2fsprogs, xfsprogs, dosfstools, ntfs-3g) — required only by `driver-init`
+
+## Cluster / Container Requirements
+
+When deploying inside a Kubernetes DaemonSet or CSI node plugin, the binaries run inside a container that typically shares the host's `/dev` and mount namespaces. The following host-level tools must be accessible inside the container:
+
+| Tool | Package | Used by | Purpose |
+|---|---|---|---|
+| `lsblk` | `util-linux` | all drivers | Enumerate block devices, resolve UUIDs, detect filesystem types |
+| `udevadm` | `systemd` / `udev` | `driver-init` | Settle udev after `mkfs` so the new UUID is immediately visible to `lsblk` |
+| `mkfs.<fstype>` | `e2fsprogs` / `xfsprogs` / `dosfstools` | `driver-init` | Format block devices |
+| `mount` / `umount` | `util-linux` | `driver-mounter` | Underlying mount syscall helpers (used by `k8s.io/mount-utils`) |
+
+### Dockerfile snippet
+
+```dockerfile
+# Debian/Ubuntu-based image
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    util-linux \
+    e2fsprogs \
+    udev \
+ && rm -rf /var/lib/apt/lists/*
+
+# Alpine-based image
+RUN apk add --no-cache util-linux e2fsprogs eudev
+```
+
+> **Note:** `udevadm settle` requires `udevd` to be running on the host or inside the container. In minimal container environments where udevd is absent, `driver-init` will log a warning and continue — but a short propagation delay may occur before `lsblk` sees the new filesystem UUID.
 
 ## Build
 
@@ -77,7 +105,11 @@ bin/driver-mounter --uuid <UUID> [flags]
 | `--fs-type` | *(auto-detect)* | Filesystem type (e.g. `ext4`); detected via `lsblk` if omitted |
 | `--options` | | Comma-separated mount options (e.g. `noatime,discard`) |
 | `--unmount` | `false` | Unmount instead of mount |
+| `--managed-only` | `false` | Only mount devices whose `lsblk` LABEL matches `--require-label`; rejects anything untagged |
+| `--require-label` | *(none)* | Required filesystem label when `--managed-only` is set (same format as `driver-init --label`) |
 | `--log-level` | `warn` | Log verbosity |
+
+> **Root-disk guardrail:** `driver-mounter` always refuses to mount a device that belongs to the disk hosting `/`, regardless of `--managed-only`. This is a hard safety check that fails open (logs a warning and proceeds) only when the root disk cannot be detected (e.g. tmpfs rootfs).
 
 **Examples:**
 
@@ -109,6 +141,7 @@ bin/driver-init [flags]
 | Flag | Default | Description |
 |---|---|---|
 | `--fs-type` | `ext4` | Filesystem to create (`ext4`, `xfs`, `vfat`, `ntfs`) |
+| `--label` | *(none)* | Filesystem label (≤10 chars, `A–Z` and `0–9` only; portable across all fs types) |
 | `--min-size` | `52428800` (50 MB) | Skip devices smaller than this (bytes) |
 | `--dry-run` | `false` | Report what would be formatted without making changes |
 | `--log-level` | `warn` | Log verbosity |

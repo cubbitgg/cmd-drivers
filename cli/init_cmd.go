@@ -30,6 +30,7 @@ type initOpts struct {
 
 	// raw flag values
 	fsType  string
+	label   string
 	minSize uint64
 	dryRun  bool
 
@@ -52,6 +53,11 @@ func (o *initOpts) validate() error {
 	if !fsutils.IsValidFSType(o.fsType) {
 		return fmt.Errorf("unsupported filesystem type %q: must be one of %s", o.fsType, fsutils.ValidFSTypeList())
 	}
+	if o.label != "" {
+		if err := fsutils.ValidateLabel(o.label); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -71,6 +77,7 @@ func (o *initOpts) run(cmd *cobra.Command, args []string) error {
 
 	config := services.InitConfig{
 		FSType:  o.fsType,
+		Label:   o.label,
 		MinSize: o.minSize,
 		DryRun:  o.dryRun,
 	}
@@ -119,6 +126,7 @@ func NewInitCmd(options ...InitOption) *cobra.Command {
 	}
 	addGlobalFlags(cmd, &opts.globalOpts)
 	cmd.Flags().StringVar(&opts.fsType, "fs-type", "", "Filesystem type for formatting (default: ext4; supported: "+fsutils.ValidFSTypeList()+")")
+	cmd.Flags().StringVar(&opts.label, "label", "", "Filesystem label (≤10 chars, A-Z and 0-9 only; portable across all supported fs types)")
 	cmd.Flags().Uint64Var(&opts.minSize, "min-size", 50*1024*1024, "Minimum device size in bytes (devices smaller than this are skipped)")
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "Report what would be formatted without making any changes")
 	cmd.AddCommand(newVersionCmd())

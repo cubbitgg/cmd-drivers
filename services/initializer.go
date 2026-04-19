@@ -12,6 +12,7 @@ import (
 // InitConfig holds parameters for a disk initialization run.
 type InitConfig struct {
 	FSType  string // filesystem to create (e.g. "ext4")
+	Label   string // optional filesystem label applied via mkfs -L; must pass fsutils.ValidateLabel
 	MinSize uint64 // skip devices smaller than this (bytes)
 	DryRun  bool   // report what would be done without formatting
 }
@@ -79,8 +80,8 @@ func (d *diskInitializer) Init(ctx context.Context) ([]string, error) {
 			log.Info().Str("device", dev).Str("fstype", d.config.FSType).Msg("[initializer] [dry-run] Would format device")
 			continue
 		}
-		log.Info().Str("device", dev).Str("fstype", d.config.FSType).Msg("[initializer] Formatting device")
-		if err := d.format.Format(ctx, dev, d.config.FSType); err != nil {
+		log.Info().Str("device", dev).Str("fstype", d.config.FSType).Str("label", d.config.Label).Msg("[initializer] Formatting device")
+		if err := d.format.Format(ctx, dev, providers.FormatOptions{FSType: d.config.FSType, Label: d.config.Label}); err != nil {
 			return targets, fmt.Errorf("format %q: %w", dev, err)
 		}
 		log.Info().Str("device", dev).Msg("[initializer] Format successful")

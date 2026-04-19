@@ -111,6 +111,7 @@ lsblk --paths --json --bytes \
 ### Requirements
 
 - `lsblk` must be available on `$PATH` (part of `util-linux`, present on all major Linux distros)
+- `udevadm` must be available on `$PATH` (part of `systemd`/`udev`); used by `driver-init` after `mkfs` to flush the kernel's udev cache so the new UUID is immediately visible to `lsblk`. If absent, a warning is logged and formatting still succeeds.
 - Must be run as root or with sufficient permissions to read device metadata
 
 ---

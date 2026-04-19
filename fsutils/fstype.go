@@ -74,3 +74,17 @@ func validFSTypeNames() string {
 	}
 	return strings.Join(names, ", ")
 }
+
+// ValidateLabel enforces the portable subset that works on every fs type this
+// tool supports (worst-case vfat): max 10 chars, A–Z and 0–9 only.
+func ValidateLabel(label string) error {
+	if len(label) == 0 || len(label) > 10 {
+		return fmt.Errorf("label %q: length must be 1–10 chars", label)
+	}
+	for _, r := range label {
+		if !(r >= 'A' && r <= 'Z') && !(r >= '0' && r <= '9') {
+			return fmt.Errorf("label %q: only uppercase A-Z and digits 0-9 are allowed", label)
+		}
+	}
+	return nil
+}

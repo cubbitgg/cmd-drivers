@@ -11,9 +11,20 @@ import (
 
 	"github.com/cubbitgg/cmd-drivers/cli"
 	"github.com/cubbitgg/cmd-drivers/fsutils"
+	"github.com/cubbitgg/cmd-drivers/models"
 	"github.com/cubbitgg/cmd-drivers/tests/loopdev"
 	"github.com/cubbitgg/cmd-drivers/tests/mocks"
 )
+
+// noopMountInfoProvider returns a mock that reports no mounts so the root-disk
+// guardrail fails open (no root detected → proceed).
+func noopMountInfoProvider() *mocks.MockMountInfoProvider {
+	return &mocks.MockMountInfoProvider{
+		GetMountsFunc: func(_ context.Context) ([]models.MountEntry, error) {
+			return nil, nil
+		},
+	}
+}
 
 const testValidUUID = "550e8400-e29b-41d4-a716-446655440000"
 
@@ -79,6 +90,7 @@ func TestIntegration_Mount_HappyPath(t *testing.T) {
 		cli.WithDeviceResolver(resolver),
 		cli.WithK8sMountProvider(mountProv),
 		cli.WithMountLSBLK(lsblk),
+		cli.WithMountMountsProvider(noopMountInfoProvider()),
 	)
 	cmd.SetArgs([]string{"--uuid", testValidUUID, "--mount-point", dir})
 
@@ -164,6 +176,45 @@ func TestIntegration_Mount_InvalidLogLevel(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "invalid log level") {
 		t.Errorf("expected 'invalid log level' in error, got: %v", err)
+	}
+}
+
+func TestIntegration_Mount_ManagedOnlyRequiresLabel(t *testing.T) {
+	cmd := cli.NewMountCmd()
+	cmd.SetArgs([]string{"--uuid", testValidUUID, "--managed-only"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error: --managed-only without --require-label, got nil")
+	}
+	if !strings.Contains(err.Error(), "--require-label") {
+		t.Errorf("expected '--require-label' in error, got: %v", err)
+	}
+}
+
+func TestIntegration_Mount_RequireLabelLowercase(t *testing.T) {
+	cmd := cli.NewMountCmd()
+	cmd.SetArgs([]string{"--uuid", testValidUUID, "--managed-only", "--require-label", "cubbit"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected validation error for lowercase label, got nil")
+	}
+	if !strings.Contains(err.Error(), "uppercase") {
+		t.Errorf("expected 'uppercase' in error, got: %v", err)
+	}
+}
+
+func TestIntegration_Mount_RequireLabelTooLong(t *testing.T) {
+	cmd := cli.NewMountCmd()
+	cmd.SetArgs([]string{"--uuid", testValidUUID, "--managed-only", "--require-label", "TOOLONGLABEL"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected validation error for too-long label, got nil")
+	}
+	if !strings.Contains(err.Error(), "length") {
+		t.Errorf("expected 'length' in error, got: %v", err)
 	}
 }
 

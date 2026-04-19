@@ -27,6 +27,8 @@ type BlockDevice struct {
 	FSType     string        `json:"fstype"`
 	UUID       string        `json:"uuid"`
 	PartUUID   string        `json:"partuuid"`
+	Label      string        `json:"label"`
+	PKName     string        `json:"pkname"`
 	Children   []BlockDevice `json:"children,omitempty"`
 }
 
@@ -145,7 +147,7 @@ func (l *lsblkImpl) GetBlockDevices(ctx context.Context, filter FilterFunc) ([]B
 		"--paths",
 		"--json",
 		"--bytes",
-		"--output", "NAME,TYPE,SIZE,ROTA,SERIAL,WWN,VENDOR,MODEL,REV,MOUNTPOINT,FSTYPE,UUID,PARTUUID",
+		"--output", "NAME,TYPE,SIZE,ROTA,SERIAL,WWN,VENDOR,MODEL,REV,MOUNTPOINT,FSTYPE,UUID,PARTUUID,LABEL,PKNAME",
 	}
 
 	// Execute command
@@ -409,6 +411,37 @@ func (l *lsblkImpl) GetUUID(ctx context.Context, device string) (string, error) 
 		Str("device", device).
 		Msg("Device not found in any search")
 	return "", fmt.Errorf("device %q not found", device)
+}
+
+// FindRootDiskDescendants returns the set of device paths (including the disk
+// itself) that belong to the same disk as rootSource. rootSource is the device
+// path backing "/" (e.g. "/dev/nvme0n1p2"). The returned set contains every
+// name in the disk's subtree so the caller can check membership in O(1).
+// Returns an empty set (not an error) when rootSource is not found in devices —
+// the caller should treat that as "root disk unknown, fail-open".
+func FindRootDiskDescendants(devices []BlockDevice, rootSource string) map[string]struct{} {
+	flat := FlattenDevices(devices)
+	// Build a fast name→exists lookup.
+	all := make(map[string]struct{}, len(flat))
+	for _, d := range flat {
+		all[d.Name] = struct{}{}
+	}
+
+	// Find the top-level disk that contains rootSource in its subtree.
+	for i := range devices {
+		subtree := FlattenDevices([]BlockDevice{devices[i]})
+		for _, d := range subtree {
+			if d.Name == rootSource {
+				// Collect every name in this disk's full subtree.
+				excluded := make(map[string]struct{}, len(subtree))
+				for _, s := range subtree {
+					excluded[s.Name] = struct{}{}
+				}
+				return excluded
+			}
+		}
+	}
+	return map[string]struct{}{}
 }
 
 // And combines multiple FilterFunc with AND logic.

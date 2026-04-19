@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cubbitgg/cmd-drivers/fsutils"
+	"github.com/cubbitgg/cmd-drivers/providers"
 	"github.com/cubbitgg/cmd-drivers/services"
 	"github.com/cubbitgg/cmd-drivers/tests/mocks"
 )
@@ -20,7 +21,7 @@ func TestUnit_Init_FormatsUnformattedDisk(t *testing.T) {
 		},
 	}
 	format := &mocks.MockFormatProvider{
-		FormatFunc: func(_ context.Context, device, fsType string) error {
+		FormatFunc: func(_ context.Context, device string, opts providers.FormatOptions) error {
 			formatted = device
 			return nil
 		},
@@ -127,7 +128,7 @@ func TestUnit_Init_FormatError(t *testing.T) {
 		},
 	}
 	format := &mocks.MockFormatProvider{
-		FormatFunc: func(_ context.Context, _, _ string) error {
+		FormatFunc: func(_ context.Context, _ string, _ providers.FormatOptions) error {
 			return errors.New("mkfs failed")
 		},
 	}
@@ -164,5 +165,36 @@ func TestUnit_Init_NoDevicesFound(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("expected empty result, got %v", got)
+	}
+}
+
+func TestUnit_Init_PassesLabelToFormat(t *testing.T) {
+	var capturedOpts providers.FormatOptions
+	lsblk := &mocks.MockLSBLK{
+		GetBlockDevicesFunc: func(_ context.Context, _ fsutils.FilterFunc) ([]fsutils.BlockDevice, error) {
+			return []fsutils.BlockDevice{
+				{Name: "/dev/sdb", Type: "disk", Size: 100 * 1024 * 1024},
+			}, nil
+		},
+	}
+	format := &mocks.MockFormatProvider{
+		FormatFunc: func(_ context.Context, _ string, opts providers.FormatOptions) error {
+			capturedOpts = opts
+			return nil
+		},
+	}
+
+	init := services.NewDiskInitializer(
+		services.InitConfig{FSType: "ext4", Label: "CUBBIT", MinSize: 0},
+		lsblk, format,
+	)
+	if _, err := init.Init(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedOpts.Label != "CUBBIT" {
+		t.Errorf("expected label CUBBIT passed to Format, got %q", capturedOpts.Label)
+	}
+	if capturedOpts.FSType != "ext4" {
+		t.Errorf("expected fstype ext4 passed to Format, got %q", capturedOpts.FSType)
 	}
 }

@@ -32,23 +32,32 @@ func WithMountLSBLK(l fsutils.LSBLK) MountOption {
 	return func(o *mountOpts) { o.lsblk = l }
 }
 
+// WithMountMountsProvider injects a MountInfoProvider used for root-disk detection.
+// If not set, a real unfiltered provider is used.
+func WithMountMountsProvider(p providers.MountInfoProvider) MountOption {
+	return func(o *mountOpts) { o.mountInfoProvider = p }
+}
+
 type mountOpts struct {
 	globalOpts
 
 	// raw flag values
-	uuid       string
-	mountPoint string
-	fsType     string
-	options    string // comma-separated, parsed in complete()
-	unmount    bool
+	uuid         string
+	mountPoint   string
+	fsType       string
+	options      string // comma-separated, parsed in complete()
+	unmount      bool
+	managedOnly  bool
+	requireLabel string
 
 	// resolved by complete()
 	mountOptions []string
 
 	// injectable last-mile providers (nil = use real implementations)
-	k8sMountProvider providers.K8sMountProvider
-	deviceResolver   providers.DeviceResolver
-	lsblk            fsutils.LSBLK
+	k8sMountProvider  providers.K8sMountProvider
+	deviceResolver    providers.DeviceResolver
+	lsblk             fsutils.LSBLK
+	mountInfoProvider providers.MountInfoProvider
 }
 
 func (o *mountOpts) complete() {
@@ -72,6 +81,14 @@ func (o *mountOpts) validate() error {
 	if o.fsType != "" && !fsutils.IsValidFSType(o.fsType) {
 		return fmt.Errorf("unsupported filesystem type %q: must be one of %s", o.fsType, fsutils.ValidFSTypeList())
 	}
+	if o.managedOnly && o.requireLabel == "" {
+		return fmt.Errorf("--managed-only requires --require-label")
+	}
+	if o.requireLabel != "" {
+		if err := fsutils.ValidateLabel(o.requireLabel); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -94,14 +111,21 @@ func (o *mountOpts) run(cmd *cobra.Command, args []string) error {
 		k8sMount = providers.NewK8sMountProvider()
 	}
 
-	config := services.MountConfig{
-		UUID:       o.uuid,
-		MountPoint: o.mountPoint,
-		FSType:     o.fsType,
-		Options:    o.mountOptions,
+	mountInfo := o.mountInfoProvider
+	if mountInfo == nil {
+		mountInfo = providers.NewUnfilteredMountInfoProvider()
 	}
 
-	mounter := services.NewDeviceMounter(config, resolver, k8sMount, lsblk)
+	config := services.MountConfig{
+		UUID:         o.uuid,
+		MountPoint:   o.mountPoint,
+		FSType:       o.fsType,
+		Options:      o.mountOptions,
+		ManagedOnly:  o.managedOnly,
+		RequireLabel: o.requireLabel,
+	}
+
+	mounter := services.NewDeviceMounter(config, resolver, k8sMount, lsblk, mountInfo)
 
 	if o.unmount {
 		return mounter.Unmount(ctx)
@@ -135,6 +159,8 @@ func NewMountCmd(options ...MountOption) *cobra.Command {
 	cmd.Flags().StringVar(&opts.fsType, "fs-type", "", "Filesystem type for mounting (auto-detected if omitted; supported: "+fsutils.ValidFSTypeList()+")")
 	cmd.Flags().StringVar(&opts.options, "options", "", "Comma-separated mount options (e.g. noatime,discard)")
 	cmd.Flags().BoolVar(&opts.unmount, "unmount", false, "Unmount the device instead of mounting it")
+	cmd.Flags().BoolVar(&opts.managedOnly, "managed-only", false, "Only mount devices whose filesystem label matches --require-label")
+	cmd.Flags().StringVar(&opts.requireLabel, "require-label", "", "Required filesystem label when --managed-only is set (≤10 chars, A-Z and 0-9 only)")
 	_ = cmd.MarkFlagRequired("uuid")
 	cmd.AddCommand(newVersionCmd())
 	return cmd

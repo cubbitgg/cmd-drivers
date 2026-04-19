@@ -228,3 +228,80 @@ func TestUnit_CustomBool_UnmarshalStringFalse(t *testing.T) {
 		}
 	}
 }
+
+// --- FindRootDiskDescendants ---
+
+func TestUnit_FindRootDiskDescendants_CollectsTree(t *testing.T) {
+	devices := []fsutils.BlockDevice{
+		{
+			Name: "/dev/sda", Type: "disk",
+			Children: []fsutils.BlockDevice{
+				{Name: "/dev/sda1", Type: "part"},
+				{Name: "/dev/sda2", Type: "part"}, // root source
+			},
+		},
+		{
+			Name:     "/dev/sdb",
+			Type:     "disk",
+			Children: []fsutils.BlockDevice{{Name: "/dev/sdb1", Type: "part"}},
+		},
+	}
+
+	excluded := fsutils.FindRootDiskDescendants(devices, "/dev/sda2")
+	for _, want := range []string{"/dev/sda", "/dev/sda1", "/dev/sda2"} {
+		if _, ok := excluded[want]; !ok {
+			t.Errorf("expected %s in excluded set, not found", want)
+		}
+	}
+	// Unrelated disk must not be in excluded set.
+	for _, notWant := range []string{"/dev/sdb", "/dev/sdb1"} {
+		if _, ok := excluded[notWant]; ok {
+			t.Errorf("expected %s NOT in excluded set, but it was", notWant)
+		}
+	}
+}
+
+func TestUnit_FindRootDiskDescendants_RootNotFound_ReturnsEmpty(t *testing.T) {
+	devices := []fsutils.BlockDevice{
+		{Name: "/dev/sda", Type: "disk"},
+	}
+	excluded := fsutils.FindRootDiskDescendants(devices, "/dev/nvme0n1p2")
+	if len(excluded) != 0 {
+		t.Errorf("expected empty excluded set when root not found, got %v", excluded)
+	}
+}
+
+// --- ValidateLabel ---
+
+func TestUnit_ValidateLabel_Valid(t *testing.T) {
+	valid := []string{"CUBBIT", "DATA1", "A", "0123456789"}
+	for _, l := range valid {
+		if err := fsutils.ValidateLabel(l); err != nil {
+			t.Errorf("expected label %q to be valid, got: %v", l, err)
+		}
+	}
+}
+
+func TestUnit_ValidateLabel_Empty(t *testing.T) {
+	if err := fsutils.ValidateLabel(""); err == nil {
+		t.Error("expected error for empty label")
+	}
+}
+
+func TestUnit_ValidateLabel_TooLong(t *testing.T) {
+	if err := fsutils.ValidateLabel("TOOLONGLABEL"); err == nil {
+		t.Error("expected error for label > 10 chars")
+	}
+}
+
+func TestUnit_ValidateLabel_Lowercase(t *testing.T) {
+	if err := fsutils.ValidateLabel("cubbit"); err == nil {
+		t.Error("expected error for lowercase label")
+	}
+}
+
+func TestUnit_ValidateLabel_Punctuation(t *testing.T) {
+	if err := fsutils.ValidateLabel("CUB-BIT"); err == nil {
+		t.Error("expected error for label with hyphen")
+	}
+}
