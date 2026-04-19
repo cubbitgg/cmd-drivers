@@ -68,7 +68,7 @@ func (m *deviceMounter) Mount(ctx context.Context) error {
 		return fmt.Errorf("check mount point %q: %w", target, err)
 	}
 	if !notMounted {
-		log.Info().Str("target", target).Msg("Already mounted, skipping")
+		log.Info().Str("target", target).Msg("[mounter] Already mounted, skipping")
 		return nil
 	}
 
@@ -89,13 +89,13 @@ func (m *deviceMounter) Mount(ctx context.Context) error {
 		Str("target", target).
 		Str("fstype", fsType).
 		Strs("options", m.config.Options).
-		Msg("Mounting device")
+		Msg("[mounter] Mounting device")
 
 	if err := m.mount.Mount(devicePath, target, fsType, m.config.Options); err != nil {
 		return err
 	}
 
-	log.Info().Str("device", devicePath).Str("target", target).Msg("Mount successful")
+	log.Info().Str("device", devicePath).Str("target", target).Msg("[mounter] Mount successful")
 	return nil
 }
 
@@ -107,7 +107,7 @@ func (m *deviceMounter) Unmount(ctx context.Context) error {
 	target := filepath.Join(m.config.MountPoint, m.config.UUID)
 
 	if _, err := os.Stat(target); os.IsNotExist(err) {
-		log.Info().Str("target", target).Msg("Mount point does not exist, nothing to unmount")
+		log.Info().Str("target", target).Msg("[mounter] Mount point does not exist, nothing to unmount")
 		return nil
 	}
 
@@ -116,11 +116,11 @@ func (m *deviceMounter) Unmount(ctx context.Context) error {
 		return fmt.Errorf("check mount point %q: %w", target, err)
 	}
 	if notMounted {
-		log.Info().Str("target", target).Msg("Not mounted, skipping")
+		log.Info().Str("target", target).Msg("[mounter] Not mounted, skipping")
 		return nil
 	}
 
-	log.Info().Str("target", target).Msg("Unmounting device")
+	log.Info().Str("target", target).Msg("[mounter] Unmounting device")
 
 	if err := m.mount.Unmount(target); err != nil {
 		return err
@@ -128,9 +128,9 @@ func (m *deviceMounter) Unmount(ctx context.Context) error {
 
 	// Best-effort: remove the now-empty directory.
 	if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
-		log.Warn().Str("target", target).Err(err).Msg("Could not remove mount directory after unmount")
+		log.Warn().Str("target", target).Err(err).Msg("[mounter] Could not remove mount directory after unmount")
 	}
 
-	log.Info().Str("target", target).Msg("Unmount successful")
+	log.Info().Str("target", target).Msg("[mounter] Unmount successful")
 	return nil
 }

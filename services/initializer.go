@@ -48,21 +48,21 @@ func (d *diskInitializer) Init(ctx context.Context) ([]string, error) {
 	for _, bd := range devices {
 		// Skip disks that already have partitions — only format bare unpartitioned disks
 		if len(bd.Children) > 0 {
-			log.Debug().Str("device", bd.Name).Msg("Skipping: disk has partitions")
+			log.Debug().Str("device", bd.Name).Msg("[initializer] Skipping: disk has partitions")
 			continue
 		}
 		// Skip if already has filesystem or UUID
 		if bd.FSType != "" || bd.UUID != "" {
-			log.Debug().Str("device", bd.Name).Str("fstype", bd.FSType).Msg("Skipping: already has filesystem")
+			log.Debug().Str("device", bd.Name).Str("fstype", bd.FSType).Msg("[initializer] Skipping: already has filesystem")
 			continue
 		}
 		// Skip mounted devices
 		if bd.Mountpoint != "" {
-			log.Debug().Str("device", bd.Name).Msg("Skipping: device is mounted")
+			log.Debug().Str("device", bd.Name).Msg("[initializer] Skipping: device is mounted")
 			continue
 		}
 		if uint64(bd.Size) < d.config.MinSize {
-			log.Debug().Str("device", bd.Name).Int64("size", int64(bd.Size)).Msg("Skipping: below minimum size")
+			log.Debug().Str("device", bd.Name).Int64("size", int64(bd.Size)).Msg("[initializer] Skipping: below minimum size")
 			continue
 		}
 
@@ -70,20 +70,20 @@ func (d *diskInitializer) Init(ctx context.Context) ([]string, error) {
 	}
 
 	if len(targets) == 0 {
-		log.Info().Msg("No unformatted devices found")
+		log.Info().Msg("[initializer] No unformatted devices found")
 		return nil, nil
 	}
 
 	for _, dev := range targets {
 		if d.config.DryRun {
-			log.Info().Str("device", dev).Str("fstype", d.config.FSType).Msg("[dry-run] Would format device")
+			log.Info().Str("device", dev).Str("fstype", d.config.FSType).Msg("[initializer] [dry-run] Would format device")
 			continue
 		}
-		log.Info().Str("device", dev).Str("fstype", d.config.FSType).Msg("Formatting device")
+		log.Info().Str("device", dev).Str("fstype", d.config.FSType).Msg("[initializer] Formatting device")
 		if err := d.format.Format(ctx, dev, d.config.FSType); err != nil {
 			return targets, fmt.Errorf("format %q: %w", dev, err)
 		}
-		log.Info().Str("device", dev).Msg("Format successful")
+		log.Info().Str("device", dev).Msg("[initializer] Format successful")
 	}
 
 	return targets, nil

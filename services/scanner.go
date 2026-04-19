@@ -69,7 +69,7 @@ func (s *scanner) ScanMounted(ctx context.Context) ([]models.DeviceInfo, error) 
 
 	entries, err := s.mounts.GetMounts(ctx)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to read mounts")
+		log.Error().Err(err).Msg("[scanner] Failed to read mounts")
 		return []models.DeviceInfo{}, err
 	}
 
@@ -79,7 +79,7 @@ func (s *scanner) ScanMounted(ctx context.Context) ([]models.DeviceInfo, error) 
 			Str("device", entry.Source).
 			Str("mountpoint", entry.Mountpoint).
 			Str("fstype", entry.FSType).
-			Msg("Processing mount")
+			Msg("[scanner] Processing mount")
 
 		info := models.DeviceInfo{
 			UUID:      s.getUUID(ctx, entry.Source),
@@ -94,13 +94,13 @@ func (s *scanner) ScanMounted(ctx context.Context) ([]models.DeviceInfo, error) 
 			info.FreeSpace = stats.FreeSpace
 			info.UsedSpace = stats.TotalSize - stats.FreeSpace
 		} else {
-			log.Warn().Err(err).Str("mountpoint", entry.Mountpoint).Msg("Failed to get disk stats")
+			log.Warn().Err(err).Str("mountpoint", entry.Mountpoint).Msg("[scanner] Failed to get disk stats")
 		}
 
 		devices = append(devices, info)
 	}
 
-	log.Info().Int("count", len(devices)).Msg("Retrieved mounted devices")
+	log.Info().Int("count", len(devices)).Msg("[scanner] Retrieved mounted devices")
 	return devices, nil
 }
 
@@ -118,20 +118,20 @@ func (s *scanner) ScanUnmounted(ctx context.Context) ([]models.DeviceInfo, error
 
 	blockDevices, err := s.lsblk.GetBlockDevices(ctx, filter)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get block devices")
+		log.Error().Err(err).Msg("[scanner] Failed to get block devices")
 		return []models.DeviceInfo{}, err
 	}
 
 	var devices []models.DeviceInfo
 	for _, bd := range blockDevices {
 		if bd.Type == "disk" && len(bd.Children) > 0 {
-			log.Debug().Str("device", bd.Name).Int("children", len(bd.Children)).Msg("Skipping disk with partitions")
+			log.Debug().Str("device", bd.Name).Int("children", len(bd.Children)).Msg("[scanner] Skipping disk with partitions")
 			continue
 		}
 
 		totalSize := uint64(bd.Size)
 		if totalSize < s.config.MinSize {
-			log.Debug().Str("device", bd.Name).Uint64("size", totalSize).Msg("Skipping device smaller than minimum size")
+			log.Debug().Str("device", bd.Name).Uint64("size", totalSize).Msg("[scanner] Skipping device smaller than minimum size")
 			continue
 		}
 
@@ -156,10 +156,10 @@ func (s *scanner) ScanUnmounted(ctx context.Context) ([]models.DeviceInfo, error
 			TotalSize: totalSize,
 		})
 
-		log.Debug().Str("device", bd.Name).Str("status", string(status)).Msg("Added unmounted device")
+		log.Debug().Str("device", bd.Name).Str("status", string(status)).Msg("[scanner] Added unmounted device")
 	}
 
-	log.Info().Int("count", len(devices)).Msg("Retrieved unmounted devices")
+	log.Info().Int("count", len(devices)).Msg("[scanner] Retrieved unmounted devices")
 	return devices, nil
 }
 
@@ -167,7 +167,7 @@ func (s *scanner) getUUID(ctx context.Context, device string) string {
 	log := logger.FromContext(ctx)
 	uuid, err := s.lsblk.GetUUID(ctx, device)
 	if err != nil || uuid == "" {
-		log.Debug().Err(err).Str("device", device).Msg("No UUID found for device")
+		log.Debug().Err(err).Str("device", device).Msg("[scanner] No UUID found for device")
 		return "N/A"
 	}
 	return uuid
